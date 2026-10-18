@@ -25,13 +25,13 @@ def validate_candidate(raw: str) -> Task:
 def mock_parse(text: str) -> Task:
     # Deliberately narrow grammar: reject extra instructions rather than guess.
     match = re.fullmatch(
-        r"(?:��)?��(?:�����ϵ�)?(?P<obj>��ɫ����|��ɫ����|��ɫ����|����)"
-        r"�Ž�(?P<target>��ߵĺ���|�ұߵĺ���|����)[����!]?", text.strip()
+        r"(?:请)?把(?:桌面上的)?(?P<obj>红色方块|蓝色方块|绿色方块|方块)"
+        r"放进(?P<target>左边的盒子|右边的盒子|盒子)[。！!]?", text.strip()
     )
     if not match:
         raise ValueError("unsupported_input")
-    objects = {"��ɫ����": "red_block", "��ɫ����": "blue_block", "��ɫ����": "green_block"}
-    targets = {"��ߵĺ���": "left_box", "�ұߵĺ���": "right_box"}
+    objects = {"红色方块": "red_block", "蓝色方块": "blue_block", "绿色方块": "green_block"}
+    targets = {"左边的盒子": "left_box", "右边的盒子": "right_box"}
     return validate_candidate(json.dumps({
         "action": "pick_and_place", "object": objects.get(match["obj"]),
         "target": targets.get(match["target"]),
@@ -47,21 +47,21 @@ def plan(text: str) -> dict:
         return {"status": "rejected", "error": "invalid_model_output", "steps": []}
     except ValueError:
         return {"status": "rejected", "error": "unsupported_input", "steps": [],
-                "question": "��ֻ����һ�ΰ��ˣ����磺�Ѻ�ɫ����Ž���ߵĺ��ӡ�"}
+                "question": "请只描述一次搬运，例如：把红色方块放进左边的盒子。"}
     questions = []
     if task.object is None:
-        questions.append("Ҫ���ĸ����飺��ɫ����ɫ������ɫ��")
+        questions.append("要搬哪个方块：红色、蓝色还是绿色？")
     if task.target is None:
-        questions.append("�Ž��ĸ����ӣ���߻����ұߣ�")
+        questions.append("放进哪个盒子：左边还是右边？")
     return {
         **task.model_dump(), "needs_clarification": bool(questions),
         "status": "clarification" if questions else "ready",
         "error": "missing_fields" if questions else None,
         "questions": questions,
         "steps": [] if questions else [
-            f"ȷ�� {task.object} �� {task.target} ��λ�ü��ɴ���",
-            f"�滮�� {task.object} ��ץȡ·��", f"ץȡ {task.object}",
-            f"�滮�� {task.target} �İ���·��", "���ò������",
+            f"确认 {task.object} 与 {task.target} 的位置及可达性",
+            f"规划到 {task.object} 的抓取路径", f"抓取 {task.object}",
+            f"规划到 {task.target} 的搬运路径", "放置并检查结果",
         ],
     }
 
@@ -88,7 +88,7 @@ def main():
     if args.evaluate:
         result = evaluate(args.evaluate)
     else:
-        text = args.text if args.text is not None else input("����������")
+        text = args.text if args.text is not None else input("机器人任务：")
         result = plan(text)
         Path("logs").mkdir(exist_ok=True)
         with Path("logs/events.jsonl").open("a", encoding="utf-8") as log:
